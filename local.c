@@ -1181,6 +1181,14 @@ static int read_device_name(struct iio_device *dev)
 		return 0;
 }
 
+static int cmp_iio_device_attr(const void *p1, const void *p2)
+{
+	const char *tmp1 = *(const char **)p1;
+	const char *tmp2 = *(const char **)p2;
+
+	return strcmp(tmp1, tmp2);
+}
+
 static int add_attr_to_device(struct iio_device *dev, const char *attr)
 {
 	char **attrs, *name;
@@ -1206,6 +1214,8 @@ static int add_attr_to_device(struct iio_device *dev, const char *attr)
 	attrs[dev->nb_attrs++] = name;
 	dev->attrs = attrs;
 	DEBUG("Added attr \'%s\' to device \'%s\'\n", attr, dev->id);
+	qsort(attrs,  dev->nb_attrs, sizeof(char *), cmp_iio_device_attr);
+
 	return 0;
 }
 
@@ -1310,11 +1320,20 @@ static void free_protected_attrs(struct iio_channel *chn)
 	pdata->protected_attrs = NULL;
 }
 
+static int cmp_iio_channel_attr(const void *p1, const void *p2)
+{
+	struct iio_channel_attr *tmp1 = (struct iio_channel_attr *)p1;
+	struct iio_channel_attr *tmp2 = (struct iio_channel_attr *)p2;
+
+	return strcmp(tmp1->name, tmp2->name);
+}
+
 static int add_attr_to_channel(struct iio_channel *chn,
 		const char *attr, const char *path, bool is_scan_element)
 {
 	struct iio_channel_attr *attrs;
 	char *fn, *name = get_short_attr_name(chn, attr);
+
 	if (!name)
 		return -ENOMEM;
 
@@ -1340,6 +1359,8 @@ static int add_attr_to_channel(struct iio_channel *chn,
 	attrs[chn->nb_attrs++].name = name;
 	chn->attrs = attrs;
 	DEBUG("Added attr \'%s\' to channel \'%s\'\n", name, chn->id);
+	qsort(attrs,  chn->nb_attrs, sizeof(struct iio_channel_attr), cmp_iio_channel_attr);
+
 	return 0;
 
 err_free_fn:
@@ -1347,6 +1368,15 @@ err_free_fn:
 err_free_name:
 	free(name);
 	return -ENOMEM;
+}
+
+static int cmp_iio_channel(const void *p1, const void *p2)
+{
+	struct iio_channel *tmp1 = *(struct iio_channel **)p1;
+	struct iio_channel *tmp2 = *(struct iio_channel **)p2;
+
+	return (strcmp(tmp1->id, tmp2->id) > 0) ||
+		(strcmp(tmp1->id, tmp2->id) == 0 && ! tmp1->is_output);
 }
 
 static int add_channel_to_device(struct iio_device *dev,
@@ -1359,8 +1389,19 @@ static int add_channel_to_device(struct iio_device *dev,
 
 	channels[dev->nb_channels++] = chn;
 	dev->channels = channels;
-	DEBUG("Added channel \'%s\' to device \'%s\'\n", chn->id, dev->id);
+	DEBUG("Added %s channel \'%s\' to device \'%s\'\n",
+		chn->is_output ? "output" : "input", chn->id, dev->id);
+	qsort(channels, dev->nb_channels, sizeof(struct iio_channel *), cmp_iio_channel);
+
 	return 0;
+}
+
+static int cmp_iio_device(const void *p1, const void *p2)
+{
+	struct iio_device *tmp1 = *(struct iio_device **)p1;
+	struct iio_device *tmp2 = *(struct iio_device **)p2;
+
+	return strcmp(tmp1->id, tmp2->id);
 }
 
 static int add_device_to_context(struct iio_context *ctx,
@@ -1374,6 +1415,8 @@ static int add_device_to_context(struct iio_context *ctx,
 	devices[ctx->nb_devices++] = dev;
 	ctx->devices = devices;
 	DEBUG("Added device \'%s\' to context \'%s\'\n", dev->id, ctx->name);
+	qsort(devices, ctx->nb_devices, sizeof(struct iio_device *), cmp_iio_device);
+
 	return 0;
 }
 
@@ -1575,6 +1618,14 @@ static int detect_and_move_global_attrs(struct iio_device *dev)
 	return 0;
 }
 
+static int cmp_iio_buffer_attr(const void *p1, const void *p2)
+{
+	const char *tmp1 = *(const char **)p1;
+	const char *tmp2 = *(const char **)p2;
+
+	return strcmp(tmp1, tmp2);
+}
+
 static int add_buffer_attr(void *d, const char *path)
 {
 	struct iio_device *dev = (struct iio_device *) d;
@@ -1599,6 +1650,8 @@ static int add_buffer_attr(void *d, const char *path)
 	attrs[dev->nb_buffer_attrs++] = attr;
 	dev->buffer_attrs = attrs;
 	DEBUG("Added buffer attr \'%s\' to device \'%s\'\n", attr, dev->id);
+	qsort(attrs, dev->nb_buffer_attrs, sizeof(char *), cmp_iio_buffer_attr);
+
 	return 0;
 }
 
